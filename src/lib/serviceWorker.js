@@ -30,7 +30,7 @@ export default class ServiceWorker {
     const match = url.match(magnetMatch)
     if (match) {
       const magnet = match[0]
-      return 'http://localhost:8081/video/small.mp4.torrent' || magnet
+      return 'http://localhost:8080/torrent/small.mp4.torrent' || magnet
     }
   }
 

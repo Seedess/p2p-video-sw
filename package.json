@@ -11,9 +11,7 @@
   "scripts": {
     "build": "webpack --env=prod",
     "start": "webpack-dev-server --env=dev",
-    "lint": "eslint src",
-    "precommit": "yarn run lint",
-    "prepush": "yarn run lint"
+    "lint": "eslint src"
   },
   "keywords": [
     "react",
