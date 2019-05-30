@@ -1,19 +1,21 @@
 import WebTorrentServiceWorker from './WebTorrentServiceWorker'
 import registerServiceWorker from './registerServiceWorker'
 import { nodeStreamToReadStream } from './river'
+import { createMagnetUri } from './torrent'
+import { toNodeBuffer } from './buffer'
 
-const debug = console.info.bind(console, '%cworker', '#ccc')
+const debug = console.log.bind(console, 'worker: ')
 
 const magnetMatch = /(magnet:\?.*btih:.+)/i
 
 export default class ServiceWorker {
 
   constructor() {
-    registerServiceWorker(event => {
+    registerServiceWorker(async event => {
       const url = new URL(event.request.url).href
       const scope = self.registration.scope
       const range = this.parseRange(event.request.headers.get('range'))
-      const magnet = this.getMagnet(url)
+      const magnet = await this.getMagnet(url)
       const clientId = event.clientId
       
       if (magnet) {
@@ -21,16 +23,19 @@ export default class ServiceWorker {
         const resp = this.onFetchTorrent(clientId, url, magnet)
         event.respondWith(resp)
       } else {
-        debug('Not magnetic request', { url })
+        //debug('Not magnetic request', { url })
       }
     })
   }
 
-  getMagnet(url) {
+  async getMagnet(url) {
     const match = url.match(magnetMatch)
     if (match) {
-      const magnet = match[0]
-      return 'http://localhost:8080/torrent/small.mp4.torrent' || magnet
+      //const magnet = match[0]
+      const torrentUrl = 'http://localhost:8080/torrent/small.mp4.torrent'
+      const torrentAb = await fetch(torrentUrl).then(resp => resp.arrayBuffer())
+      debug('torrentAb', torrentAb)
+      return createMagnetUri(toNodeBuffer(torrentAb), torrentUrl) // magnet
     }
   }
 

@@ -1,6 +1,6 @@
 import WebTorrentRemoteClient from 'webtorrent-remote/client'
 
-const debug = console.info.bind(console, 'client')
+const debug = console.info.bind(console, 'client: ')
 
 export default class WebTorrentServiceWorker {
 
