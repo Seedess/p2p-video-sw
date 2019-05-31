@@ -1,4 +1,4 @@
-import WebTorrentRemoteServer from 'webtorrent-remote/server'
+import WebTorrentRemoteServer from '../../modules/webtorrent-remote/server'
 
 const debug = console.info.bind(console, 'server: ')
 
@@ -17,7 +17,7 @@ export default class WebTorrentServiceWorkerServer {
   }
 
   receiveMessageEvent = event => {
-    debug('receive message', { event })
+    debug('receive message', { ...event.data })
     this.port = event.ports[0]
     this.server.receive(this._unserialize(event.data))
   }

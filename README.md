@@ -47,3 +47,9 @@ Report bugs or do suggestions using the [issues](https://github.com/Seedess/p2p-
 ## License
 
 [MIT License](LICENSE)
+
+## Todo
+
+* Explore indexedDB as transport for streams
+* Benchmarks
+* Tests

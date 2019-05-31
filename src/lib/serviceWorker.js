@@ -7,36 +7,35 @@ import { toNodeBuffer } from './buffer'
 const debug = console.log.bind(console, 'worker: ')
 
 const magnetMatch = /(magnet:\?.*btih:.+)/i
+const videoMatch = /\.mp4$/i
 
 export default class ServiceWorker {
 
   constructor() {
-    registerServiceWorker(async event => {
+    registerServiceWorker(event => {
       const url = new URL(event.request.url).href
       const scope = self.registration.scope
       const range = this.parseRange(event.request.headers.get('range'))
-      const magnet = await this.getMagnet(url)
       const clientId = event.clientId
       
-      if (magnet) {
-        debug('Magnetic request', { clientId, url, magnet, scope, range })
-        const resp = this.onFetchTorrent(clientId, url, magnet)
+      if (this.isVideoUrl(url)) {
+        debug('Video request', { clientId, url, scope, range })
+        const resp = this.onFetchVideo(clientId, url)
         event.respondWith(resp)
       } else {
-        //debug('Not magnetic request', { url })
+        //debug('Not video request', { url })
       }
     })
   }
 
+  isVideoUrl(url) {
+    return url.match(videoMatch)
+  }
+
   async getMagnet(url) {
-    const match = url.match(magnetMatch)
-    if (match) {
-      //const magnet = match[0]
-      const torrentUrl = 'http://localhost:8080/torrent/small.mp4.torrent'
-      const torrentAb = await fetch(torrentUrl).then(resp => resp.arrayBuffer())
-      debug('torrentAb', torrentAb)
-      return createMagnetUri(toNodeBuffer(torrentAb), torrentUrl) // magnet
-    }
+    const torrentUrl = 'http://localhost:8080/torrent/small.mp4.torrent'
+    const torrentAb = await fetch(torrentUrl).then(resp => resp.arrayBuffer())
+    return createMagnetUri(toNodeBuffer(torrentAb), torrentUrl) + '&ws=' + url + '?no-p2p' // magnet
   }
 
   parseRange(header) {
@@ -54,32 +53,35 @@ export default class ServiceWorker {
    * @param {array} files 
    */
   getVideofile(files) {
-    return files.sort( (a, b) => a.length <= b.length).shift()
+    return [ ...files.sort( (a, b) => a.length <= b.length) ].shift()
   }
   
-  onFetchTorrent(clientId, url, torrentId) {
-
-    debug('onFetchTorrent', { clientId, url, torrentId })
+  onFetchVideo(clientId, url) {
+    debug('onFetchVideo', { clientId, url })
   
     return clients.get(clientId)
       .then(client => {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
           const webTorrent = new WebTorrentServiceWorker(client)
+          const torrentId = await this.getMagnet(url)
+          debug('onFetchVideo add torrent', { torrentId })
           webTorrent.webTorrentRemoteClient.add(torrentId, (error, torrent) => {
             if (error) {
               return reject(error)
             }
             debug('adding web seed', url)
-            //torrent.addWebSeed(url)
+            torrent.addWebSeed(url)
             torrent.on('metadata', () => {
               const video = this.getVideofile(torrent.files)
+              debug('torrent metadata', { infoHash: torrent.infoHash, video })
               resolve(video)
             })
           })
         })
       })
       .then(video => {
-        const stream = nodeStreamToReadStream(video.createReadStream())
+        //nodeStreamToReadStream
+        const stream = (video.createReadStream())
         debug('stream', stream)
         return stream
       })

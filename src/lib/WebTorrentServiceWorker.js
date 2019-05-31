@@ -1,4 +1,4 @@
-import WebTorrentRemoteClient from 'webtorrent-remote/client'
+import WebTorrentRemoteClient from '../../modules/webtorrent-remote/client'
 
 const debug = console.info.bind(console, 'client: ')
 
@@ -11,7 +11,7 @@ export default class WebTorrentServiceWorker {
 
   constructor(webWorkerClient) {
     this.webWorkerClient = webWorkerClient
-    this.webTorrentRemoteClient = new WebTorrentRemoteClient(this.sendMessage)
+    this.webTorrentRemoteClient = new WebTorrentRemoteClient(this.sendMessage, { updateInterval: 60000 })
   }
 
   createMessageChannel(cb) {
@@ -32,7 +32,7 @@ export default class WebTorrentServiceWorker {
   }
   
   receiveMessageEvent = event => {
-    debug('received message', { event })
+    debug('received message', { ...event.data })
     this.webTorrentRemoteClient.receive(this._unserialize(event.data))
   }
 

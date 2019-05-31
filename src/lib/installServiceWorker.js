@@ -1,3 +1,5 @@
+const debug = console.log.bind(console, 'sw:install: ')
+
 const installServiceWorker = path => {
   if (navigator.serviceWorker && window.fetch && window.ReadableStream) {
     return navigator.serviceWorker.register(path, {
@@ -11,23 +13,23 @@ const installServiceWorker = path => {
             switch (installingWorker.state) {
               case 'installed':
                 if (navigator.serviceWorker.controller) {
-                  console.log('New or updated content is available.')
+                  debug('New or updated content is available.')
                 } else {
-                  console.log('Content is now available offline!')
+                  debug('Content is now available offline!')
                 }
                 break
               case 'redundant':
-                console.info('The installing service worker became redundant.')
+                debug('The installing service worker became redundant.')
                 break
             }
           }
         }
       })
       .catch(error => {
-        console.error('Failed to install service worker', error)
+        debug('Failed to install service worker', error)
       })
   } else {
-    console.error('Service Worker, Fetch, or ReadableStream API is not supported.')
+    debug('Service Worker, Fetch, or ReadableStream API is not supported.')
   }
 }
 
