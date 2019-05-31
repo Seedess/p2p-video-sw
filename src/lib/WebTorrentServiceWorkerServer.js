@@ -2,6 +2,9 @@ import WebTorrentRemoteServer from '../../modules/webtorrent-remote/server'
 
 const debug = console.info.bind(console, 'server: ')
 
+/**
+ * Runs in the browser window scope and posts messages to the service worker scope
+ */
 export default class WebTorrentServiceWorkerServer {
 
   port = null

@@ -69,7 +69,8 @@ export default class ServiceWorker {
             if (error) {
               return reject(error)
             }
-            debug('adding web seed', url)
+            const webseedURL = url + '?no-p2p'
+            debug('adding web seed', webseedURL)
             torrent.addWebSeed(url)
             torrent.on('metadata', () => {
               const video = this.getVideofile(torrent.files)
@@ -80,8 +81,7 @@ export default class ServiceWorker {
         })
       })
       .then(video => {
-        //nodeStreamToReadStream
-        const stream = (video.createReadStream())
+        const stream = nodeStreamToReadStream(video.createReadStream())
         debug('stream', stream)
         return stream
       })

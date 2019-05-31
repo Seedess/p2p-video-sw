@@ -24,6 +24,24 @@ export function createReadableStream(cb) {
 }
 
 /**
+ * Create a readable node stream and get a WhatWG stream writer for it
+ * @param {function} cb 
+ */
+export function createNodeReadableStream(cb) {
+  const nodeReadStream = new PassThrough()
+  const readStream = createReadableStream(writer => {
+    cb(writer)
+  })
+  readFromStream(
+    readStream, 
+    data => nodeReadStream.write(data), 
+    () => nodeReadStream.end(), 
+    error => nodeReadStream.emit('error', error)
+  )
+  return nodeReadStream
+}
+
+/**
  * Read from a Node Stream
  * @param {Stream} Node stream 
  * @param {function} onData 
