@@ -8,19 +8,23 @@ const debug = console.log.bind(console, 'worker: ')
 
 const magnetMatch = /(magnet:\?.*btih:.+)/i
 const videoMatch = /\.mp4$/i
+const allowRangeRequests = true
 
 export default class ServiceWorker {
+
+  webTorrentServiceWorkers = {}
 
   constructor() {
     registerServiceWorker(event => {
       const url = new URL(event.request.url).href
       const scope = self.registration.scope
-      const range = this.parseRange(event.request.headers.get('range'))
+      const rangeHeader = event.request.headers.get('range')
+      const range = this.parseRange(rangeHeader)
       const clientId = event.clientId
       
       if (this.isVideoUrl(url)) {
-        debug('Video request', { clientId, url, scope, range })
-        const resp = this.onFetchVideo(clientId, url)
+        debug('Video request', { clientId, url, scope, range, rangeHeader })
+        const resp = this.onFetchVideo(clientId, url, range, rangeHeader)
         event.respondWith(resp)
       } else {
         //debug('Not video request', { url })
@@ -48,6 +52,31 @@ export default class ServiceWorker {
     }
   }
 
+  getRangeResponse(video, range) {
+    const stream = video.createReadStream()
+    const fileLength = video.length
+    const contentLength = fileLength - (range[0] || 0)
+    const contentRange = (range[0] || '0') + '-' + (range[1] || fileLength - 1) + '/' + fileLength
+    const headers = {
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=0',
+      'Connection': 'keep-alive',
+      'Content-Length': contentLength,
+      'Content-Range': `bytes ${contentRange}`,
+      'Content-Type': 'video/mp4',
+      'X-Powered-By': 'Seedess',
+    }
+    const resp = new Response(stream, {
+      headers
+    })
+    debug('range response', resp, headers)
+    return resp
+  }
+
+  getFullResponse(video) {
+    return  new Response(nodeStreamToReadStream(video.createReadStream()))
+  }
+
   /**
    * Retrieves the largest file assuming it's the main video file
    * @param {array} files 
@@ -56,13 +85,19 @@ export default class ServiceWorker {
     return [ ...files.sort( (a, b) => a.length <= b.length) ].shift()
   }
   
-  onFetchVideo(clientId, url) {
-    debug('onFetchVideo', { clientId, url })
+  onFetchVideo(clientId, url, range, rangeHeader) {
+    debug('onFetchVideo', { clientId, url, range })
+
+    const isRangeRequest = rangeHeader
   
     return clients.get(clientId)
       .then(client => {
         return new Promise(async (resolve, reject) => {
-          const webTorrent = new WebTorrentServiceWorker(client)
+          if (!this.webTorrentServiceWorkers[clientId]) {
+            debug('Does not have service worker', { clientId, client })
+            this.webTorrentServiceWorkers[clientId] = new WebTorrentServiceWorker(client)
+          }
+          const webTorrent =  this.webTorrentServiceWorkers[clientId]
           const torrentId = await this.getMagnet(url)
           debug('onFetchVideo add torrent', { torrentId })
           webTorrent.webTorrentRemoteClient.add(torrentId, (error, torrent) => {
@@ -81,12 +116,10 @@ export default class ServiceWorker {
         })
       })
       .then(video => {
-        const stream = nodeStreamToReadStream(video.createReadStream())
-        debug('stream', stream)
-        return stream
-      })
-      .then(stream => {
-        const resp = new Response(stream)
+        debug('get stream range', range)
+        const resp = isRangeRequest && allowRangeRequests
+          ? this.getRangeResponse(video, range) 
+          : this.getFullResponse(video)
         debug('response', resp)
         return resp
       })

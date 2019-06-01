@@ -13,6 +13,7 @@ export default class WebTorrentServiceWorker {
   clientDisconnected = false
 
   constructor(webWorkerClient) {
+    debug('creating new webtorrent service worker', webWorkerClient)
     this.webWorkerClient = webWorkerClient
     this.webTorrentRemoteClient = new WebTorrentRemoteClient(this.sendMessage, { updateInterval: 60000 })
   }
