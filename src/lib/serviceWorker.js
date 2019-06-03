@@ -1,4 +1,4 @@
-import WebTorrentServiceWorker from './WebTorrentServiceWorker'
+import WTRemoteClientInServiceWorker from './WTRemoteClientInServiceWorker'
 import registerServiceWorker from './registerServiceWorker'
 import { nodeStreamToReadStream } from './river'
 import { createMagnetUri } from './torrent'
@@ -9,10 +9,11 @@ const debug = console.log.bind(console, 'worker: ')
 const magnetMatch = /(magnet:\?.*btih:.+)/i
 const videoMatch = /\.mp4$/i
 const allowRangeRequests = true
+const WTRemoteClientInServiceWorkerOpts = { updateInterval: 60000, canSendStream: false }
 
 export default class ServiceWorker {
 
-  webTorrentServiceWorkers = {}
+  WTRemoteClientInServiceWorkers = {}
 
   constructor() {
     registerServiceWorker(event => {
@@ -21,6 +22,7 @@ export default class ServiceWorker {
       const rangeHeader = event.request.headers.get('range')
       const range = this.parseRange(rangeHeader)
       const clientId = event.clientId
+      debug('body', event.request.body)
       
       if (this.isVideoUrl(url)) {
         debug('Video request', { clientId, url, scope, range, rangeHeader })
@@ -29,7 +31,37 @@ export default class ServiceWorker {
       } else {
         //debug('Not video request', { url })
       }
+
+      if (this.isSeedessVideoStreamUrl(url)) {
+        this.onFetchSeedessVideoStream(event)
+      }
     })
+  }
+
+  isSeedessVideoStreamUrl(url) {
+    return url.match('https://stream.seedess.com/')
+  }
+
+  async onFetchSeedessVideoStream(event) {
+    const { headers } = event.request
+    const clientKey = headers.get('x-seedess-clientKey')
+    const message = {
+      clientKey,
+      torrentKey: headers.get('x-seedess-torrentKey'),
+      fileKey: headers.get('x-seedess-fileKey'),
+      type: headers.get('x-seedess-type'),
+      streamKey: headers.get('x-seedess-streamKey'),
+      stream: event.request.body,
+    }
+
+    // @todo Request.prototype.stream does not implement ReadableStream yet
+    // currently only available with experimental flag in chrome
+    // safari has a a Request.prototype.body but cannot use a ReadableStream in new Request()
+    if (!event.request.body || !(event.request.body instanceof ReadableStream)) {
+      throw new Error('Request.prototype.body is unsupported in this browser')
+    }
+    debug('seedess stream url', event, { message, clientKey })
+    this.WTRemoteClientInServiceWorkers[clientKey].receiveStream(message)
   }
 
   isVideoUrl(url) {
@@ -93,11 +125,12 @@ export default class ServiceWorker {
     return clients.get(clientId)
       .then(client => {
         return new Promise(async (resolve, reject) => {
-          if (!this.webTorrentServiceWorkers[clientId]) {
+          if (!this.WTRemoteClientInServiceWorkers[clientId]) {
             debug('Does not have service worker', { clientId, client })
-            this.webTorrentServiceWorkers[clientId] = new WebTorrentServiceWorker(client)
+            const opts = { ...WTRemoteClientInServiceWorkerOpts, clientKey: clientId }
+            this.WTRemoteClientInServiceWorkers[clientId] = new WTRemoteClientInServiceWorker(client, opts)
           }
-          const webTorrent =  this.webTorrentServiceWorkers[clientId]
+          const webTorrent =  this.WTRemoteClientInServiceWorkers[clientId]
           const torrentId = await this.getMagnet(url)
           debug('onFetchVideo add torrent', { torrentId })
           webTorrent.webTorrentRemoteClient.add(torrentId, (error, torrent) => {

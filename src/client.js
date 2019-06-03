@@ -1,4 +1,4 @@
-import WebTorrentRemoteServer from './lib/WebTorrentServiceWorkerServer'
+import WebTorrentRemoteServer from './lib/WTRemoteServerInWindow'
 
 export default class Client {
 
