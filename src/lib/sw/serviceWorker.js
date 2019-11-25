@@ -1,19 +1,33 @@
 import WTRemoteClientInServiceWorker from './WTRemoteClientInServiceWorker'
-import registerServiceWorker from './registerServiceWorker'
-import { nodeStreamToReadStream } from './river'
-import { createMagnetUri } from './torrent'
-import { toNodeBuffer } from './buffer'
+import registerServiceWorker from '../window/registerServiceWorker'
+import { nodeStreamToReadStream } from '../river'
+import { createMagnetUri } from '../torrent'
+import { toNodeBuffer } from '../buffer'
 
 const debug = console.log.bind(console, 'worker: ')
 
-const magnetMatch = /(magnet:\?.*btih:.+)/i
+const magnetMatch = /^(magnet\:\?.*btih:.+)$/i
+const seedessUrlMatch = /^https\:\/\/stream\.seedess\.com\//
 const videoMatch = /\.mp4$/i
-const allowRangeRequests = true
-const WTRemoteClientInServiceWorkerOpts = { updateInterval: 60000, canSendStream: false }
+const allowRangeRequests = 1
+const WTRemoteClientInServiceWorkerOpts = {
+  updateInterval: 60000, 
+  canSendStream: false 
+}
 
 export default class ServiceWorker {
 
-  WTRemoteClientInServiceWorkers = {}
+  WTRemoteClientList = {}
+
+  getWTRemoteClient(client) {
+    const clientId = client.id
+    if (!this.WTRemoteClientList[clientId]) {
+      debug('Does not have service worker', { clientId, client })
+      const opts = { ...WTRemoteClientInServiceWorkerOpts, clientKey: clientId }
+      this.WTRemoteClientList[clientId] = new WTRemoteClientInServiceWorker(client, opts)
+    }
+    return this.WTRemoteClientList[clientId]
+  }
 
   constructor() {
     registerServiceWorker(event => {
@@ -38,8 +52,12 @@ export default class ServiceWorker {
     })
   }
 
+  isMagnet(identifer) {
+    return magnetMatch.test(identifer)
+  }
+
   isSeedessVideoStreamUrl(url) {
-    return url.match('https://stream.seedess.com/')
+    return seedessUrlMatch.test(url)
   }
 
   async onFetchSeedessVideoStream(event) {
@@ -61,7 +79,7 @@ export default class ServiceWorker {
       throw new Error('Request.prototype.body is unsupported in this browser')
     }
     debug('seedess stream url', event, { message, clientKey })
-    this.WTRemoteClientInServiceWorkers[clientKey].receiveStream(message)
+    this.WTRemoteClientList[clientKey].receiveStream(message)
   }
 
   isVideoUrl(url) {
@@ -85,28 +103,39 @@ export default class ServiceWorker {
   }
 
   getRangeResponse(video, range) {
-    const stream = video.createReadStream()
+    const start = parseInt(range.start || 0, 10)
+    const end = parseInt(range.end || video.length - 1, 10)
+    const nodeStream = video.createReadStream({ start, end })
+    const stream = nodeStreamToReadStream(nodeStream)
     const fileLength = video.length
-    const contentLength = fileLength - (range[0] || 0)
-    const contentRange = (range[0] || '0') + '-' + (range[1] || fileLength - 1) + '/' + fileLength
+    const contentLength = stream.length
+    const contentRange = start + '-' + end + '/' + fileLength
     const headers = {
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'public, max-age=0',
-      'Connection': 'keep-alive',
-      'Content-Length': contentLength,
-      'Content-Range': `bytes ${contentRange}`,
+      //'Content-Length': contentLength,
+      //'Content-Range': `bytes ${contentRange}`,
       'Content-Type': 'video/mp4',
       'X-Powered-By': 'Seedess',
     }
-    const resp = new Response(stream, {
-      headers
-    })
-    debug('range response', resp, headers)
+    const streams = stream.tee()
+    const resp = new Response(streams.pop(), { headers })
+    debug('range response', { resp, headers, range, stream, nodeStream })
+    global.readableStreams = [ ...(global.readableStreams || []),  streams.pop()]
     return resp
   }
 
   getFullResponse(video) {
-    return  new Response(nodeStreamToReadStream(video.createReadStream()))
+    const nodeStream = video.createReadStream()
+    const stream = nodeStreamToReadStream(nodeStream)
+    const headers = {
+      'Accept-Ranges': 'bytes',
+      'Content-Length': video.length,
+      'Content-Type': 'video/mp4',
+      'X-Powered-By': 'Seedess',
+    }
+    const resp =  new Response(stream, { headers })
+    debug('full response', { resp, headers, stream, nodeStream })
+    return resp
   }
 
   /**
@@ -125,12 +154,7 @@ export default class ServiceWorker {
     return clients.get(clientId)
       .then(client => {
         return new Promise(async (resolve, reject) => {
-          if (!this.WTRemoteClientInServiceWorkers[clientId]) {
-            debug('Does not have service worker', { clientId, client })
-            const opts = { ...WTRemoteClientInServiceWorkerOpts, clientKey: clientId }
-            this.WTRemoteClientInServiceWorkers[clientId] = new WTRemoteClientInServiceWorker(client, opts)
-          }
-          const webTorrent =  this.WTRemoteClientInServiceWorkers[clientId]
+          const webTorrent =  this.getWTRemoteClient(client)
           const torrentId = await this.getMagnet(url)
           debug('onFetchVideo add torrent', { torrentId })
           webTorrent.webTorrentRemoteClient.add(torrentId, (error, torrent) => {

@@ -15,6 +15,6 @@ const APP_CONFIG = {
 };
 
 module.exports = env => {
-  const config = require(`./config/webpack.${env}`)(APP_CONFIG);
+  const config = require(`./webpack/webpack.${env}`)(APP_CONFIG);
   return config;
 };

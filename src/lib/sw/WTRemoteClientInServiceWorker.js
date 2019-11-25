@@ -1,4 +1,4 @@
-import WebTorrentRemoteClient from '../../modules/webtorrent-remote/client'
+import WebTorrentRemoteClient from '../../../modules/webtorrent-remote/client'
 
 const debug = console.info.bind(console, 'client: ')
 

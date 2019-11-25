@@ -6,7 +6,7 @@ module.exports = function(config) {
   const _config = {
     //target: "node",
     entry: {
-      sw: ['babel-polyfill', config.serviceWorkerJs],
+      sw: [config.serviceWorkerJs],
       index: config.indexJs
     },
     output: {

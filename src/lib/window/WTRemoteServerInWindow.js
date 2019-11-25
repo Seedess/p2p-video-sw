@@ -1,12 +1,12 @@
-import WebTorrentRemoteServer from '../../modules/webtorrent-remote/server'
-import { nodeStreamToReadStream } from './river'
+import WebTorrentRemoteServer from '../../../modules/webtorrent-remote/server'
+import { nodeStreamToReadStream } from '../river'
 
 const debug = console.info.bind(console, 'server: ')
 
 /**
  * Runs in the browser window scope and posts messages to the service worker scope
  */
-export default class WebTorrentServiceWorkerServer {
+export default class WebTorrentRemoteServerInWindow {
 
   port = null
 
