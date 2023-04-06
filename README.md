@@ -1,8 +1,12 @@
-# seedess/p2p-video-sw
+# seedess/p2p-video-sw (deprecated)
 
 A P2P Video Streaming Service worker. 
 
 Will intercept video streams and create secure P2P enabled video streams transparently. 
+
+## Deprecation
+
+Service Workers is now build into WebTorrent - https://webtorrent.io/
 
 ## Requirements
 
